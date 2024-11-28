@@ -1,0 +1,45 @@
+name: Test Authentication with GCP
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  auth-test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Step 2: Authenticate with GCP using Workload Identity Federation
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          service_account: 'gitops-cicd@fast-ability-439911-u1.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/github/providers/my-repo'
+
+      # Step 3: Configure GCP project and region
+      - name: Set GCP project and region
+        run: |
+          gcloud config set project fast-ability-439911-u1
+          gcloud config set compute/region us-central1
+
+      # Step 4: Test access to the Terraform state bucket
+      - name: Test bucket access
+        run: |
+          gsutil ls gs://terraform-state-bucket-0001120
+
+      # Step 5: Validate IAM roles of the service account
+      - name: Validate IAM permissions
+        run: |
+          gcloud projects get-iam-policy fast-ability-439911-u1 \
+            --flatten="bindings[].members" \
+            --format="table(bindings.role)" \
+            --filter="bindings.members:gitops-cicd@fast-ability-439911-u1.iam.gserviceaccount.com"
