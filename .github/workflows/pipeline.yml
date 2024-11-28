@@ -23,7 +23,7 @@ jobs:
         uses: google-github-actions/auth@v2
         with:
           service_account: 'gitops-cicd@fast-ability-439911-u1.iam.gserviceaccount.com'
-          workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/github/providers/my-repo'
+          workload_identity_provider: 'projects/784674387874/locations/global/workloadIdentityPools/github/providers/my-repo'
 
       # Step 3: Configure GCP project and region
       - name: Set GCP project and region
