@@ -1,54 +1,45 @@
-name: 'Terraform CI'
+name: Test Authentication with GCP
 
 on:
   push:
     branches:
-    - 'feature/**'
-    - main
-  pull_request:
+      - main
+  workflow_dispatch:
 
 jobs:
-  terraform:
-    name: 'Terraform'
+  auth-test:
     runs-on: ubuntu-latest
     permissions:
       contents: 'read'
       id-token: 'write'
-    env:
-      WORKING_DIRECTORY: 
-      PROJECT_ID: 
-      PROJECT_NUMBER: 
-    defaults:
-      run:
-        shell: bash
 
     steps:
-    - name: Checkout
-      uses: actions/checkout@v2
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v3
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      # Step 2: Authenticate with GCP using Workload Identity Federation
+      - name: Authenticate with GCP
+        uses: google-github-actions/auth@v2
+        with:
+          service_account: 'gitops-cicd@fast-ability-439911-u1.iam.gserviceaccount.com'
+          workload_identity_provider: 'projects/123456789/locations/global/workloadIdentityPools/github/providers/my-repo'
 
-    - name: Set Google Cloud credentials
-      uses: 'google-github-actions/auth@v2'
-      with:
-        service_account: 'jit-access@${{ env.PROJECT_ID }}.iam.gserviceaccount.com'
-        workload_identity_provider: 'projects/${{ env.PROJECT_NUMBER }}/locations/global/workloadIdentityPools/test-terraform/providers/jit-access'
+      # Step 3: Configure GCP project and region
+      - name: Set GCP project and region
+        run: |
+          gcloud config set project fast-ability-439911-u1
+          gcloud config set compute/region us-central1
 
-    - name: Terraform Init
-      run: terraform init
-      working-directory: ${{ env.WORKING_DIRECTORY }}
+      # Step 4: Test access to the Terraform state bucket
+      - name: Test bucket access
+        run: |
+          gsutil ls gs://terraform-state-bucket-0001120
 
-    - name: Terraform Format
-      run: terraform fmt -check
-      continue-on-error: true
-      working-directory: ${{ env.WORKING_DIRECTORY }}
-
-    - name: Terraform Plan
-      run: terraform plan 
-      working-directory: ${{ env.WORKING_DIRECTORY }}
-
-    - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -auto-approve
-      working-directory: ${{ env.WORKING_DIRECTORY }}
+      # Step 5: Validate IAM roles of the service account
+      - name: Validate IAM permissions
+        run: |
+          gcloud projects get-iam-policy fast-ability-439911-u1 \
+            --flatten="bindings[].members" \
+            --format="table(bindings.role)" \
+            --filter="bindings.members:gitops-cicd@fast-ability-439911-u1.iam.gserviceaccount.com"
